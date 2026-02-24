@@ -3,13 +3,13 @@
       "id": "grandpa",
       "name": "Hon Kim Ching",
       "birthdate": "1933-03-04",
-      "photo": "images/grandpa.jpg"
+      "photo": "images/kimching.jpg"
     },
     {
       "id": "grandma",
       "name": "Ng Lok Moi",
       "birthdate": "1940-03-28",
-      "photo": "images/grandma.jpg"
+      "photo": "images/lokmoi.jpg"
     },
     {
       "id": "woonyee",
