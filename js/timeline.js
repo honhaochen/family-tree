@@ -61,11 +61,84 @@ viewport.addEventListener("pointermove", (e) => {
 viewport.addEventListener("pointerup", () => isDown = false);
 viewport.addEventListener("pointercancel", () => isDown = false);
 
-// Wheel: translate vertical wheel into horizontal scroll on desktop only
+// Wheel: vertical wheel or pinch (ctrlKey) changes gap scale; horizontal scrolls timeline
+const SCALE_STEP = 4;
+const SCALE_PINCH_FACTOR = 0.02;
+let scaleWheelDebounce = null;
+
+function applyScaleDelta(delta, debounceRender) {
+  const min = Number(scaleInput.min) || 6;
+  const max = Number(scaleInput.max) || 60;
+  let v = Number(scaleInput.value) || 20;
+  v = Math.round(v + delta);
+  v = Math.min(max, Math.max(min, v));
+  scaleInput.value = v;
+  setScale(v);
+  if (debounceRender) {
+    clearTimeout(scaleWheelDebounce);
+    scaleWheelDebounce = setTimeout(() => {
+      scaleWheelDebounce = null;
+      loadAndRender();
+    }, 150);
+  } else {
+    loadAndRender();
+  }
+}
+
 viewport.addEventListener("wheel", (e) => {
   if (isMobileView()) return;
-  const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-  viewport.scrollLeft += delta;
+  const vertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
+  const pinch = e.ctrlKey || e.metaKey; // pinch on trackpad often sets ctrlKey
+  if (vertical || pinch) {
+    e.preventDefault();
+    const delta = (e.deltaY > 0 ? -SCALE_STEP : SCALE_STEP) * (pinch ? Math.abs(e.deltaY) * SCALE_PINCH_FACTOR || 1 : 1);
+    applyScaleDelta(Math.round(delta) || (e.deltaY > 0 ? -1 : 1), true);
+  } else {
+    viewport.scrollLeft += e.deltaX;
+  }
+}, { passive: false });
+
+// Pinch (two fingers) on touch devices: change gap scale
+let pinchStartDistance = 0;
+let pinchStartScale = 0;
+let pinchRenderScheduled = false;
+
+function touchDistance(touches) {
+  const a = touches[0], b = touches[1];
+  return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+}
+
+viewport.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 2) {
+    pinchStartDistance = touchDistance(e.touches);
+    pinchStartScale = Number(scaleInput.value) || 20;
+  }
+}, { passive: true });
+
+viewport.addEventListener("touchmove", (e) => {
+  if (e.touches.length !== 2) return;
+  e.preventDefault();
+  const dist = touchDistance(e.touches);
+  const min = Number(scaleInput.min) || 6;
+  const max = Number(scaleInput.max) || 60;
+  const ratio = dist / pinchStartDistance;
+  let v = Math.round(pinchStartScale * ratio);
+  v = Math.min(max, Math.max(min, v));
+  if (v !== Number(scaleInput.value)) {
+    scaleInput.value = v;
+    setScale(v);
+    if (!pinchRenderScheduled) {
+      pinchRenderScheduled = true;
+      requestAnimationFrame(() => {
+        loadAndRender();
+        pinchRenderScheduled = false;
+      });
+    }
+  }
+}, { passive: false });
+
+viewport.addEventListener("touchend", (e) => {
+  if (e.touches.length < 2) pinchStartDistance = 0;
 }, { passive: true });
 
 // -------- Helpers --------
@@ -133,10 +206,13 @@ function computePositions(people, pxPerYear, minGap) {
   return { pos, minYear: minY, maxYear: maxY, contentSize };
 }
 
+const MOBILE_TOP_OFFSET = 80;
+
 function applyCanvasSize(contentSize) {
   if (isMobileView()) {
     canvas.style.width = "100%";
-    canvas.style.height = `${Math.max(contentSize, viewport.clientHeight)}px`;
+    const h = contentSize + MOBILE_TOP_OFFSET;
+    canvas.style.height = `${Math.max(h, viewport.clientHeight)}px`;
   } else {
     canvas.style.width = `${Math.max(contentSize, viewport.clientWidth + 80)}px`;
     canvas.style.height = "";
@@ -162,7 +238,14 @@ function renderTicks(minYear, maxYear, pxPerYear) {
   }
 }
 
-function renderPeople(people, positions) {
+/* Must match --canvas-inset-left in CSS (desktop) so dots align with timeline/ticks */
+function getDesktopCanvasInsetLeft() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--canvas-inset-left").trim();
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 140;
+}
+
+function renderPeople(people, positions, minYear, pxPerYear) {
   canvas.querySelectorAll(".person").forEach(n => n.remove());
 
   const mobile = isMobileView();
@@ -171,13 +254,16 @@ function renderPeople(people, positions) {
     const node = document.createElement("div");
 
     if (!mobile) {
+      /* Use true year position so dots align with year ticks; cards may overlap slightly for same-year births */
+      const insetLeft = getDesktopCanvasInsetLeft();
+      const trueX = (p._yearPos - minYear) * pxPerYear;
       node.className = `person ${idx % 2 === 0 ? "above" : "below"}`;
-      node.style.left = `${positions[idx]}px`;
+      node.style.left = `${insetLeft + trueX}px`;
       node.style.removeProperty("--y");
     } else {
       node.className = `person ${idx % 2 === 0 ? "left" : "right"}`;
       node.style.left = "50%";
-      node.style.setProperty("--y", `${positions[idx]}px`);
+      node.style.setProperty("--y", `${MOBILE_TOP_OFFSET + positions[idx]}px`);
     }
 
     const stem = document.createElement("div");
@@ -231,6 +317,13 @@ function renderPeople(people, positions) {
     node.appendChild(stem);
     node.appendChild(dot);
     node.appendChild(card);
+
+    card.addEventListener("click", (e) => {
+      e.stopPropagation();
+      canvas.querySelectorAll(".person").forEach((el) => { el.style.zIndex = ""; });
+      node.style.zIndex = "100";
+      canvas.appendChild(node);
+    });
 
     canvas.appendChild(node);
   });
@@ -310,8 +403,9 @@ async function loadAndRender() {
     const minGap = Number(getComputedStyle(document.documentElement).getPropertyValue("--min-gap")) || 120;
 
     const { pos, minYear, maxYear, contentSize } = computePositions(people, pxPerYear, minGap);
+    const desktopContentSize = getDesktopCanvasInsetLeft() + (maxYear - minYear) * pxPerYear + 320;
 
-    applyCanvasSize(contentSize);
+    applyCanvasSize(isMobileView() ? contentSize : desktopContentSize);
 
     if (!isMobileView()) {
       renderTicks(minYear, maxYear, pxPerYear);
@@ -319,7 +413,7 @@ async function loadAndRender() {
       ticksEl.innerHTML = "";
     }
 
-    renderPeople(people, pos);
+    renderPeople(people, pos, minYear, pxPerYear);
     centerTimeline();
 
   } catch (err) {
