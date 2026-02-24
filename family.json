@@ -1,0 +1,122 @@
+[
+    {
+      "id": "grandpa",
+      "name": "Hon Kim Ching",
+      "birthdate": "1933-03-04",
+      "photo": "images/grandpa.jpg"
+    },
+    {
+      "id": "grandma",
+      "name": "Ng Lok Moi",
+      "birthdate": "1940-03-28",
+      "photo": "images/grandma.jpg"
+    },
+    {
+      "id": "woonyee",
+      "name": "Hon Woon Yee",
+      "birthdate": "1965-04-22",
+      "photo": "images/woonyee.jpg"
+    },
+    {
+      "id": "sookyee",
+      "name": "Hon Sook Yee",
+      "birthdate": "1980-06-07",
+      "photo": "images/sookyee.jpg"
+    },
+    {
+      "id": "haoyang",
+      "name": "Hon Hao Yang",
+      "birthdate": "2005-08-26",
+      "photo": "images/haoyang.jpg"
+    },
+    {
+      "id": "haosheng",
+      "name": "Hon Hao Sheng",
+      "birthdate": "2008-10-17",
+      "photo": "images/haosheng.jpg"
+    },
+    {
+      "id": "woonpin",
+      "name": "Hon Woon Pin",
+      "birthdate": "1968-05-31",
+      "photo": "images/woonpin.jpg"
+    },
+    {
+      "id": "chinyit",
+      "name": "Ng Chin Yit",
+      "birthdate": "1968-03-10",
+      "photo": "images/chinyit.jpg"
+    },
+    {
+      "id": "haozheng",
+      "name": "Hon Hao Zheng",
+      "birthdate": "1997-01-06",
+      "photo": "images/haozheng.jpg"
+    },
+    {
+      "id": "haochen",
+      "name": "Hon Hao Chen",
+      "birthdate": "1999-03-26",
+      "photo": "images/haochen.jpg"
+    },
+    {
+      "id": "chiaqian",
+      "name": "Tan Chia Qian",
+      "birthdate": "1999-03-08",
+      "photo": "images/chiaqian.jpg"
+    },
+    {
+      "id": "haoyuan",
+      "name": "Hon Hao Yuan",
+      "birthdate": "2003-05-19",
+      "photo": "images/haoyuan.jpg"
+    },
+    {
+      "id": "meimei",
+      "name": "Hon Mei Mei",
+      "birthdate": "1966-12-09",
+      "photo": "images/meimei.jpg"
+    },
+    {
+      "id": "meiha",
+      "name": "Hon Mei Ha",
+      "birthdate": "1965-12-07",
+      "photo": "images/meiha.jpg"
+    },
+    {
+      "id": "cheeyip",
+      "name": "Wong Chee Yip",
+      "birthdate": "1969-11-15",
+      "photo": "images/cheeyip.jpg"
+    },
+    {
+      "id": "meiling",
+      "name": "Hon Mei Ling",
+      "birthdate": "1973-05-13",
+      "photo": "images/meiling.jpg"
+    },
+    {
+      "id": "weihao",
+      "name": "Wong Wei Hao",
+      "birthdate": "2003-07-11",
+      "photo": "images/weihao.jpg"
+    },
+    {
+      "id": "waiyin",
+      "name": "Chen Wai Yin",
+      "birthdate": "1968-01-01",
+      "photo": "images/waiyin.jpg"
+    },
+    {
+      "id": "meifun",
+      "name": "Hon Mei Fun",
+      "birthdate": "1974-12-01",
+      "photo": "images/meifun.jpg"
+    },
+    {
+      "id": "mingluo",
+      "name": "Chen Ming Luo",
+      "birthdate": "2004-06-27",
+      "photo": "images/mingluo.jpg"
+    }
+  ]

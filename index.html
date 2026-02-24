@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Family Timeline</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+<header>
+  <div class="wrap">
+    <div class="title">
+      <h1>Family Timeline</h1>
+      <p>Scroll sideways to see who was born earlier/later. Gaps scale by year distance.</p>
+    </div>
+
+    <div class="controls">
+      <div class="chip" id="bdayChip" aria-live="polite">
+        <label>Next birthday</label>
+        <span id="bdayText" style="font-size:12px;color:var(--text);font-weight:600;">
+          Loading…
+        </span>
+      </div>
+      <div class="chip">
+        <label for="scale">Gap scale</label>
+        <input id="scale" type="range" min="6" max="60" value="20" />
+        <span id="scaleVal" style="font-size:12px;color:var(--muted);min-width:56px;text-align:right;">20px/yr</span>
+      </div>
+      <div class="chip">
+        <button id="centerBtn" type="button">Center timeline</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="hint">
+  Tip: use trackpad shift-scroll / mouse wheel / drag / swipe.
+  <span id="status"></span>
+</div>
+
+<div id="viewport" class="viewport">
+  <div id="canvas" class="canvas">
+    <div class="timeline-line"></div>
+    <div id="ticks" class="ticks"></div>
+  </div>
+</div>
+
+<script src="js/timeline.js"></script>
+</body>
+</html>
