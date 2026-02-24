@@ -7,9 +7,9 @@
     },
     {
       "id": "grandma",
-      "name": "Ng Lok Moi",
+      "name": "Ng Lock Moi",
       "birthdate": "1940-03-28",
-      "photo": "images/lokmoi.jpg"
+      "photo": "images/lockmoi.jpg"
     },
     {
       "id": "woonyee",
@@ -19,7 +19,7 @@
     },
     {
       "id": "sookyee",
-      "name": "Hon Sook Yee",
+      "name": "Onn Sook Yee",
       "birthdate": "1980-06-07",
       "photo": "images/sookyee.jpg"
     },
@@ -97,7 +97,7 @@
     },
     {
       "id": "weihao",
-      "name": "Wong Wei Hao",
+      "name": "Dickie Wong Wei Hao",
       "birthdate": "2003-07-11",
       "photo": "images/weihao.jpg"
     },
@@ -110,7 +110,7 @@
     {
       "id": "meifun",
       "name": "Hon Mei Fun",
-      "birthdate": "1974-12-01",
+      "birthdate": "1974-12-17",
       "photo": "images/meifun.jpg"
     },
     {
