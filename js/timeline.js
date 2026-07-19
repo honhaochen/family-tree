@@ -1,5 +1,6 @@
 /**
- * Family Timeline – load family.json, render timeline, drag/wheel scroll, birthday banner
+ * Family Timeline – load family.json, render vertical timeline, drag/wheel scroll,
+ * parent/spouse connector lines, birthday banner
  */
 
 // -------- Responsive root font size (all rem values scale with viewport) --------
@@ -27,41 +28,67 @@ const DATA_URL = "./family.json";  // must be in same repo for GitHub Pages
 const viewport = document.getElementById("viewport");
 const canvas = document.getElementById("canvas");
 const ticksEl = document.getElementById("ticks");
+const connectorsEl = document.getElementById("connectors");
 const statusEl = document.getElementById("status");
 const scaleInput = document.getElementById("scale");
 const scaleVal = document.getElementById("scaleVal");
 const centerBtn = document.getElementById("centerBtn");
+const topPanel = document.getElementById("topPanel");
 
-// -------- Interaction: drag/swipe to scroll --------
+const TOP_OFFSET = 80;
+
+// One color per sub-family branch; cycles if there are ever more branches than colors.
+const BRANCH_PALETTE = ["#7db8ff", "#ff9f7d", "#7dffb0", "#d68dff", "#ffe37d", "#ff7d9f", "#7de0ff", "#ffb37d"];
+const NEUTRAL_COLOR = "rgba(255,255,255,0.45)";
+
+let highlightedId = null;
+
+// -------- Auto-hiding top panel: hide as soon as scrolling down starts, only show again at the top --------
+const TOP_EDGE_THRESHOLD = 24; // always show once back within this many px of the top
+const SCROLL_DIRECTION_THRESHOLD = 6; // ignore tiny/jittery deltas
+
+function syncHeaderClearance() {
+  const h = Math.ceil(topPanel.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--header-clearance", `${h}px`);
+}
+
+let lastScrollTop = viewport.scrollTop;
+
+viewport.addEventListener("scroll", () => {
+  const current = viewport.scrollTop;
+  const delta = current - lastScrollTop;
+
+  if (current <= TOP_EDGE_THRESHOLD) {
+    topPanel.classList.remove("hidden"); // only reappears once scrolled back to the top
+  } else if (delta > SCROLL_DIRECTION_THRESHOLD) {
+    topPanel.classList.add("hidden"); // scrolling down, even partway through
+  }
+
+  lastScrollTop = current;
+}, { passive: true });
+
+// -------- Interaction: drag/swipe to scroll (vertical) --------
 let isDown = false;
-let startX = 0, startY = 0;
-let startScrollLeft = 0, startScrollTop = 0;
+let startY = 0;
+let startScrollTop = 0;
 
 viewport.addEventListener("pointerdown", (e) => {
   isDown = true;
   viewport.setPointerCapture(e.pointerId);
-  startX = e.clientX;
   startY = e.clientY;
-  startScrollLeft = viewport.scrollLeft;
   startScrollTop = viewport.scrollTop;
 });
 
 viewport.addEventListener("pointermove", (e) => {
   if (!isDown) return;
-  const dx = e.clientX - startX;
   const dy = e.clientY - startY;
-
-  if (isMobileView()) {
-    viewport.scrollTop = startScrollTop - dy;
-  } else {
-    viewport.scrollLeft = startScrollLeft - dx;
-  }
+  viewport.scrollTop = startScrollTop - dy;
 });
 
 viewport.addEventListener("pointerup", () => isDown = false);
 viewport.addEventListener("pointercancel", () => isDown = false);
 
-// Wheel: vertical wheel or pinch (ctrlKey) changes gap scale; horizontal scrolls timeline
+// Wheel: pinch (ctrl/meta) changes gap scale; plain wheel scrolls natively (no handling needed)
 const SCALE_STEP = 4;
 const SCALE_PINCH_FACTOR = 0.02;
 let scaleWheelDebounce = null;
@@ -86,16 +113,11 @@ function applyScaleDelta(delta, debounceRender) {
 }
 
 viewport.addEventListener("wheel", (e) => {
-  if (isMobileView()) return;
-  const vertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
   const pinch = e.ctrlKey || e.metaKey; // pinch on trackpad often sets ctrlKey
-  if (vertical || pinch) {
-    e.preventDefault();
-    const delta = (e.deltaY > 0 ? -SCALE_STEP : SCALE_STEP) * (pinch ? Math.abs(e.deltaY) * SCALE_PINCH_FACTOR || 1 : 1);
-    applyScaleDelta(Math.round(delta) || (e.deltaY > 0 ? -1 : 1), true);
-  } else {
-    viewport.scrollLeft += e.deltaX;
-  }
+  if (!pinch) return; // let native vertical scroll happen
+  e.preventDefault();
+  const delta = (e.deltaY > 0 ? -SCALE_STEP : SCALE_STEP) * (Math.abs(e.deltaY) * SCALE_PINCH_FACTOR || 1);
+  applyScaleDelta(Math.round(delta) || (e.deltaY > 0 ? -1 : 1), true);
 }, { passive: false });
 
 // Pinch (two fingers) on touch devices: change gap scale
@@ -142,10 +164,6 @@ viewport.addEventListener("touchend", (e) => {
 }, { passive: true });
 
 // -------- Helpers --------
-function isMobileView() {
-  return window.matchMedia("(max-width: 520px)").matches;
-}
-
 function parseDate(dateStr) {
   const s = String(dateStr).replaceAll("/", "-");
   const d = new Date(s + "T00:00:00");
@@ -179,13 +197,8 @@ function setScale(pxPerYear) {
 }
 
 function centerTimeline() {
-  if (isMobileView()) {
-    const midY = (canvas.scrollHeight - viewport.clientHeight) / 2;
-    viewport.scrollTop = Math.max(0, midY);
-  } else {
-    const midX = (canvas.scrollWidth - viewport.clientWidth) / 2;
-    viewport.scrollLeft = Math.max(0, midX);
-  }
+  const midY = (canvas.scrollHeight - viewport.clientHeight) / 2;
+  viewport.scrollTop = Math.max(0, midY);
 }
 
 function computePositions(people, pxPerYear, minGap) {
@@ -206,17 +219,10 @@ function computePositions(people, pxPerYear, minGap) {
   return { pos, minYear: minY, maxYear: maxY, contentSize };
 }
 
-const MOBILE_TOP_OFFSET = 80;
-
 function applyCanvasSize(contentSize) {
-  if (isMobileView()) {
-    canvas.style.width = "100%";
-    const h = contentSize + MOBILE_TOP_OFFSET;
-    canvas.style.height = `${Math.max(h, viewport.clientHeight)}px`;
-  } else {
-    canvas.style.width = `${Math.max(contentSize, viewport.clientWidth + 80)}px`;
-    canvas.style.height = "";
-  }
+  canvas.style.width = "100%";
+  const h = contentSize + TOP_OFFSET;
+  canvas.style.height = `${Math.max(h, viewport.clientHeight)}px`;
 }
 
 function renderTicks(minYear, maxYear, pxPerYear) {
@@ -227,10 +233,10 @@ function renderTicks(minYear, maxYear, pxPerYear) {
   const step = pxPerYear >= 28 ? 1 : (pxPerYear >= 16 ? 2 : 5);
 
   for (let y = start; y <= end; y += step) {
-    const left = (y - minYear) * pxPerYear;
+    const top = (y - minYear) * pxPerYear;
     const t = document.createElement("div");
     t.className = "tick";
-    t.style.left = `${left}px`;
+    t.style.top = `${top}px`;
     const label = document.createElement("span");
     label.textContent = String(y);
     t.appendChild(label);
@@ -238,33 +244,15 @@ function renderTicks(minYear, maxYear, pxPerYear) {
   }
 }
 
-/* Must match --canvas-inset-left in CSS (desktop) so dots align with timeline/ticks */
-function getDesktopCanvasInsetLeft() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue("--canvas-inset-left").trim();
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : 140;
-}
-
-function renderPeople(people, positions, minYear, pxPerYear) {
+function renderPeople(people, positions) {
   canvas.querySelectorAll(".person").forEach(n => n.remove());
-
-  const mobile = isMobileView();
 
   people.forEach((p, idx) => {
     const node = document.createElement("div");
-
-    if (!mobile) {
-      /* Use true year position so dots align with year ticks; cards may overlap slightly for same-year births */
-      const insetLeft = getDesktopCanvasInsetLeft();
-      const trueX = (p._yearPos - minYear) * pxPerYear;
-      node.className = `person ${idx % 2 === 0 ? "above" : "below"}`;
-      node.style.left = `${insetLeft + trueX}px`;
-      node.style.removeProperty("--y");
-    } else {
-      node.className = `person ${idx % 2 === 0 ? "left" : "right"}`;
-      node.style.left = "50%";
-      node.style.setProperty("--y", `${MOBILE_TOP_OFFSET + positions[idx]}px`);
-    }
+    node.className = `person ${idx % 2 === 0 ? "left" : "right"}`;
+    node.dataset.id = p.id;
+    node.style.left = "50%";
+    node.style.setProperty("--y", `${TOP_OFFSET + positions[idx]}px`);
 
     const stem = document.createElement("div");
     stem.className = "stem";
@@ -323,11 +311,181 @@ function renderPeople(people, positions, minYear, pxPerYear) {
       canvas.querySelectorAll(".person").forEach((el) => { el.style.zIndex = ""; });
       node.style.zIndex = "100";
       canvas.appendChild(node);
+
+      if (highlightedId === p.id) {
+        clearHighlight();
+        highlightedId = null;
+      } else {
+        highlightedId = p.id;
+        highlightPerson(highlightedId);
+      }
     });
 
     canvas.appendChild(node);
   });
 }
+
+// -------- Relationship connector lines --------
+function cardAnchor(personNode, canvasRect) {
+  const card = personNode.querySelector(".card");
+  const r = card.getBoundingClientRect();
+  const isLeft = personNode.classList.contains("left");
+  /* Outer edge (away from the center line) so connectors sweep in from
+     the screen's sides rather than bunching near the timeline. */
+  return {
+    x: (isLeft ? r.left : r.right) - canvasRect.left,
+    y: (r.top + r.height / 2) - canvasRect.top,
+  };
+}
+
+/* A stub curve from a card's outer edge in to a shared meeting point on the
+   timeline's center line, rather than all the way across to the other card -
+   so it's always clear where a relationship "ends". */
+function connectorStubPath(from, centerX, meetY) {
+  const midX = (from.x + centerX) / 2;
+  return `M ${from.x},${from.y} Q ${midX},${from.y} ${centerX},${meetY}`;
+}
+
+function appendConnectorPair(parentEl, aId, bId, className, a, b, color, centerX) {
+  const meetY = (a.y + b.y) / 2;
+  [a, b].forEach((point) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("class", `connector ${className}`);
+    path.setAttribute("d", connectorStubPath(point, centerX, meetY));
+    path.style.stroke = color;
+    path.dataset.a = aId;
+    path.dataset.b = bId;
+    parentEl.appendChild(path);
+  });
+}
+
+/* The father among a person's recorded parents (falls back to the first
+   parent if gender data is missing/incomplete). */
+function fatherIdOf(person, byId) {
+  for (const parentId of person.parents) {
+    const parent = byId.get(parentId);
+    if (parent && parent.gender === "m") return parentId;
+  }
+  return person.parents[0] || null;
+}
+
+/* One color per father: every child of the same father shares that father's
+   color, so a father's whole brood reads as a single-color unit rather than
+   one color per branch/lineage. */
+function computeFatherColors(people, byId) {
+  const colorByFather = new Map();
+
+  people.forEach((p) => {
+    if (!p.parents.length) return;
+    const fatherId = fatherIdOf(p, byId);
+    if (fatherId && !colorByFather.has(fatherId)) {
+      colorByFather.set(fatherId, BRANCH_PALETTE[colorByFather.size % BRANCH_PALETTE.length]);
+    }
+  });
+
+  return {
+    fatherIdOf: (p) => fatherIdOf(p, byId),
+    colorForFather: (fatherId) => colorByFather.get(fatherId) || NEUTRAL_COLOR,
+  };
+}
+
+/* Pairs of full siblings (same recorded parents), chained in birth order
+   (A-B, B-C, ...) rather than every pair, to avoid an O(n^2) tangle. */
+function computeSiblingPairs(people) {
+  const groups = new Map();
+  people.forEach((p) => {
+    if (!p.parents.length) return;
+    const key = [...p.parents].sort().join("|");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p.id);
+  });
+
+  const pairs = [];
+  groups.forEach((ids) => {
+    for (let i = 1; i < ids.length; i++) {
+      pairs.push([ids[i - 1], ids[i]]);
+    }
+  });
+  return pairs;
+}
+
+function drawConnectors(people) {
+  connectorsEl.innerHTML = "";
+
+  const byId = new Map(people.map(p => [p.id, p]));
+  const nodeById = new Map(
+    Array.from(canvas.querySelectorAll(".person")).map(n => [n.dataset.id, n])
+  );
+  const canvasRect = canvas.getBoundingClientRect();
+  const centerX = canvasRect.width / 2;
+  const { fatherIdOf: getFatherId, colorForFather } = computeFatherColors(people, byId);
+
+  people.forEach((p) => {
+    const childNode = nodeById.get(p.id);
+    if (!childNode || !p.parents.length) return;
+    const fatherId = getFatherId(p);
+    if (!fatherId) return;
+    const fatherNode = nodeById.get(fatherId);
+    if (!byId.has(fatherId) || !fatherNode) {
+      console.warn(`Unresolved father id "${fatherId}" for "${p.id}"`);
+      return;
+    }
+    const a = cardAnchor(childNode, canvasRect);
+    const b = cardAnchor(fatherNode, canvasRect);
+    appendConnectorPair(connectorsEl, p.id, fatherId, "connector-parent", a, b, colorForFather(fatherId), centerX);
+  });
+
+  const drawnSpousePairs = new Set();
+  people.forEach((p) => {
+    if (!p.spouse) return;
+    const spouse = byId.get(p.spouse);
+    const spouseNode = nodeById.get(p.spouse);
+    if (!spouse || !spouseNode) {
+      console.warn(`Unresolved spouse id "${p.spouse}" for "${p.id}"`);
+      return;
+    }
+    const key = [p.id, p.spouse].sort().join("|");
+    if (drawnSpousePairs.has(key)) return;
+    drawnSpousePairs.add(key);
+
+    const selfNode = nodeById.get(p.id);
+    const a = cardAnchor(selfNode, canvasRect);
+    const b = cardAnchor(spouseNode, canvasRect);
+    const husbandId = p.gender === "m" ? p.id : (spouse.gender === "m" ? spouse.id : null);
+    const color = husbandId ? colorForFather(husbandId) : NEUTRAL_COLOR;
+    appendConnectorPair(connectorsEl, p.id, p.spouse, "connector-spouse", a, b, color, centerX);
+  });
+
+  computeSiblingPairs(people).forEach(([aId, bId]) => {
+    const aNode = nodeById.get(aId);
+    const bNode = nodeById.get(bId);
+    if (!aNode || !bNode) return;
+    const a = cardAnchor(aNode, canvasRect);
+    const b = cardAnchor(bNode, canvasRect);
+    appendConnectorPair(connectorsEl, aId, bId, "connector-sibling", a, b, NEUTRAL_COLOR, centerX);
+  });
+
+  if (highlightedId) highlightPerson(highlightedId);
+}
+
+function highlightPerson(id) {
+  connectorsEl.querySelectorAll(".connector").forEach((el) => {
+    const related = el.dataset.a === id || el.dataset.b === id;
+    el.classList.toggle("highlighted", related);
+    el.classList.toggle("dimmed", !related);
+  });
+}
+
+function clearHighlight() {
+  connectorsEl.querySelectorAll(".connector").forEach((el) => {
+    el.classList.remove("highlighted", "dimmed");
+  });
+}
+
+canvas.addEventListener("click", () => {
+  clearHighlight();
+  highlightedId = null;
+});
 
 // -------- Birthday countdown --------
 function daysUntilNextBirthday(birthDate, nowMidnight) {
@@ -392,6 +550,9 @@ async function loadAndRender() {
         name: String(p.name ?? "Unnamed"),
         birthdate: String(p.birthdate),
         photo: p.photo ? String(p.photo) : "",
+        parents: Array.isArray(p.parents) ? p.parents.filter(Boolean) : [],
+        spouse: p.spouse || null,
+        gender: p.gender || null,
         _date: d,
         _yearPos: yearFraction(d),
       };
@@ -403,17 +564,11 @@ async function loadAndRender() {
     const minGap = Number(getComputedStyle(document.documentElement).getPropertyValue("--min-gap")) || 120;
 
     const { pos, minYear, maxYear, contentSize } = computePositions(people, pxPerYear, minGap);
-    const desktopContentSize = getDesktopCanvasInsetLeft() + (maxYear - minYear) * pxPerYear + 320;
 
-    applyCanvasSize(isMobileView() ? contentSize : desktopContentSize);
-
-    if (!isMobileView()) {
-      renderTicks(minYear, maxYear, pxPerYear);
-    } else {
-      ticksEl.innerHTML = "";
-    }
-
-    renderPeople(people, pos, minYear, pxPerYear);
+    applyCanvasSize(contentSize);
+    renderTicks(minYear, maxYear, pxPerYear);
+    renderPeople(people, pos);
+    drawConnectors(people);
     centerTimeline();
 
   } catch (err) {
@@ -433,10 +588,12 @@ centerBtn.addEventListener("click", centerTimeline);
 
 let resizeTimer = null;
 window.addEventListener("resize", () => {
+  syncHeaderClearance();
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(loadAndRender, 150);
 });
 
 setInterval(loadAndRender, 60 * 1000);
 
+syncHeaderClearance();
 loadAndRender();

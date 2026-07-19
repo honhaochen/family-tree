@@ -8,41 +8,46 @@
 </head>
 
 <body>
-<header>
-  <div class="wrap">
-    <div class="title">
-      <h1>Hon Family Tree</h1>
-      <p>Scroll sideways to see who was born earlier/later. Gaps scale by year distance.</p>
-    </div>
+<div id="topPanel" class="top-panel">
+  <header>
+    <div class="wrap">
+      <div class="title">
+        <h1>Hon Family Tree</h1>
+        <p>Scroll down to see who was born earlier/later. Lines connect parents, children and spouses.</p>
+      </div>
 
-    <div class="controls">
-      <div class="chip" id="bdayChip" aria-live="polite">
-        <label>Next birthday</label>
-        <span id="bdayText" style="font-size:12px;color:var(--text);font-weight:600;">
-          Loading…
-        </span>
+      <div class="controls">
+        <div class="chip" id="bdayChip" aria-live="polite">
+          <label>Next birthday</label>
+          <span id="bdayText" style="font-size:12px;color:var(--text);font-weight:600;">
+            Loading…
+          </span>
+        </div>
+        <div class="chip">
+          <label for="scale">Gap scale</label>
+          <input id="scale" type="range" min="50" max="350" value="80" />
+          <span id="scaleVal" style="font-size:12px;color:var(--muted);min-width:56px;text-align:right;">20px/yr</span>
+        </div>
+        <div class="chip">
+          <button id="centerBtn" type="button">Center timeline</button>
+        </div>
       </div>
-      <div class="chip">
-        <label for="scale">Gap scale</label>
-        <input id="scale" type="range" min="50" max="350" value="80" />
-        <span id="scaleVal" style="font-size:12px;color:var(--muted);min-width:56px;text-align:right;">20px/yr</span>
-      </div>
-      <div class="chip">
-        <button id="centerBtn" type="button">Center timeline</button>
-      </div>
+    </div>
+  </header>
+
+  <div class="hint">
+    <div class="hint-inner">
+      Tip: scroll, drag, or swipe to move through time. Pinch (or Ctrl/Cmd + wheel) to zoom. Click a card to trace their family lines.
+      <span id="status"></span>
     </div>
   </div>
-</header>
-
-<div class="hint">
-  Tip: use trackpad shift-scroll / mouse wheel / drag / swipe.
-  <span id="status"></span>
 </div>
 
 <div id="viewport" class="viewport">
   <div id="canvas" class="canvas">
     <div class="timeline-line"></div>
     <div id="ticks" class="ticks"></div>
+    <svg id="connectors" class="connectors" aria-hidden="true"></svg>
   </div>
 </div>
 

@@ -20,13 +20,17 @@ html {
   --card-border: rgba(255,255,255,0.12);
   --avatar-bg: #1a2332;
   --avatar-border: rgba(255,255,255,0.18);
+  --connector-neutral: rgba(255,255,255,0.45);
 
   /* Controls spacing:
      px per year => bigger => larger gaps (more dramatic timeline distance) */
   --px-per-year: 20;
-  --min-gap: 120; /* minimum horizontal gap between consecutive people (px) */
-  --canvas-inset-left: 140px;
-  --canvas-inset-right: 60px;
+  --min-gap: 120; /* minimum vertical gap between consecutive people (px) */
+  --canvas-top-offset: 80px;
+  --canvas-bottom-offset: 40px;
+  --card-gutter: 64px;  /* distance from center line to nearest card edge */
+  --avatar-size: 64px;
+  --header-clearance: 88px; /* synced by JS to the top panel's real height */
 }
 
 * { box-sizing: border-box; }
@@ -42,10 +46,20 @@ body {
   overflow: hidden; /* we provide our own scrolling container */
 }
 
-header {
-  position: sticky;
+.top-panel {
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 5;
+  transition: transform 0.3s ease;
+}
+
+.top-panel.hidden {
+  transform: translateY(-100%);
+}
+
+header {
   backdrop-filter: blur(10px);
   background: linear-gradient(to bottom, rgba(11,15,23,0.85), rgba(11,15,23,0.25));
   border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -124,101 +138,147 @@ header {
 
 /* Timeline viewport */
 .viewport {
-  height: calc(100vh - 68px);
-  overflow: auto;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.25) transparent;
-  padding: 18px 0 40px;
+  padding: calc(var(--header-clearance) + env(safe-area-inset-top, 0px)) 0 40px;
 }
 
 .viewport::-webkit-scrollbar { height: 10px; width: 10px; }
 .viewport::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: 999px; }
 .viewport::-webkit-scrollbar-track { background: transparent; }
 
-/* Big horizontal canvas */
+/* Big vertical canvas */
 .canvas {
   position: relative;
-  height: 520px;
-  min-height: 520px;
-  padding: 0 var(--canvas-inset-right) 0 var(--canvas-inset-left);
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  padding: var(--canvas-top-offset) 16px var(--canvas-bottom-offset);
   display: block;
 }
 
 /* The center line */
 .timeline-line {
   position: absolute;
-  left: var(--canvas-inset-left);
-  right: var(--canvas-inset-right);
-  top: 50%;
-  height: 2px;
-  background: linear-gradient(to right, transparent, var(--line), transparent);
-  transform: translateY(-50%);
+  left: 50%;
+  top: var(--canvas-top-offset);
+  bottom: var(--canvas-bottom-offset);
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, var(--line), transparent);
+  transform: translateX(-50%);
   border-radius: 999px;
+  z-index: 0;
 }
 
-/* Year ticks band */
+/* Year ticks, running down the center line */
 .ticks {
   position: absolute;
-  left: var(--canvas-inset-left);
-  right: var(--canvas-inset-right);
-  top: calc(50% + 18px);
-  height: 24px;
+  left: 50%;
+  top: var(--canvas-top-offset);
+  bottom: var(--canvas-bottom-offset);
   pointer-events: none;
-  display: flex;
-  align-items: flex-start;
+  z-index: 0;
 }
 
 .tick {
   position: absolute;
-  top: 0;
-  width: 1px;
-  height: 10px;
+  left: 0;
+  width: 10px;
+  height: 1px;
+  transform: translate(-50%, -50%);
   background: rgba(255,255,255,0.20);
 }
 
 .tick span {
   position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 0.6875rem;
   color: rgba(255,255,255,0.55);
   white-space: nowrap;
 }
 
-/* Person card pinned to x position; alternate above/below */
+/* Relationship connector lines, drawn over the timeline but under the cards */
+.connectors {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.connector {
+  fill: none;
+  stroke: var(--connector-neutral); /* fallback; JS sets the actual per-branch color inline */
+  transition: opacity 0.15s ease, stroke-width 0.15s ease;
+}
+
+/* Parent ↔ child: solid line, colored by sub-family branch */
+.connector-parent {
+  stroke-width: 1.75px;
+}
+
+/* Spouses: dashed line, colored by the couple's shared branch */
+.connector-spouse {
+  stroke-width: 1.5px;
+  stroke-dasharray: 9 5;
+}
+
+/* Siblings: dotted, always neutral (a sibling pair can straddle two branches once married) */
+.connector-sibling {
+  stroke-width: 1.5px;
+  stroke-dasharray: 1.5 5;
+  stroke-linecap: round;
+}
+
+.connector.dimmed { opacity: 0.12; }
+.connector.highlighted { opacity: 1; stroke-width: 2.75px; }
+
+/* Person card pinned to a y position on the timeline; alternate left/right */
 .person {
   position: absolute;
-  top: 50%;
+  width: min(720px, 92%);
+  left: 50% !important;
+  top: var(--y, 0px);
   transform: translate(-50%, -50%);
-  width: 220px;
   user-select: none;
-  touch-action: pan-x;
+  touch-action: pan-y;
   isolation: isolate; /* stacking context so stem/dot stay behind card */
+  z-index: 2;
 }
 
 .card {
-  position: relative;
-  z-index: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(50% - var(--card-gutter));
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  z-index: 3;
 }
+
+.person.left .card { left: 0; }
+.person.right .card { left: calc(50% + var(--card-gutter)); }
 
 .card-inner {
   display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 10px;
-  padding: 12px;
+  grid-template-columns: var(--avatar-size) 1fr;
+  gap: 12px;
+  padding: 14px;
   align-items: center;
 }
 
 .avatar {
-  width: 54px;
-  height: 54px;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--avatar-border);
@@ -253,194 +313,63 @@ header {
 
 .dot {
   position: absolute;
-  z-index: -1;
+  top: 50%;
   left: 50%;
   width: 10px;
   height: 10px;
   border-radius: 999px;
   background: var(--dot);
-  transform: translateX(-50%);
-  top: 50%;
+  transform: translate(-50%, -50%);
   box-shadow: 0 0 0 6px rgba(120,180,255,0.16);
+  z-index: 2;
 }
 
 .stem {
   position: absolute;
-  z-index: -2;
-  left: 50%;
-  width: 2px;
-  background: rgba(255,255,255,0.22);
-  transform: translateX(-50%);
-  border-radius: 999px;
-}
-
-/* --- Desktop fix: anchor dot+stem on timeline, move only the card --- */
-:root {
-  --card-gap: 70px; /* distance from timeline to card */
-}
-
-/* Always anchor the person at the timeline center */
-.person {
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* Dot stays on the timeline */
-.person .dot {
-  top: 50%;
-  z-index: 2;
-}
-
-/* Stem starts at the timeline and reaches toward the card */
-.person .stem {
   top: 50%;
   left: 50%;
+  height: 2px;
+  width: var(--card-gutter);
   background: rgba(255,255,255,0.22);
   border-radius: 999px;
   z-index: 1;
 }
 
-/* Move ONLY the card */
-.person .card {
-  position: absolute;
-  left: 50%;
-  width: 220px;
-  transform: translateX(-50%);
-  z-index: 3;
-}
+.person.left .stem { transform: translate(-100%, -50%); }
+.person.right .stem { transform: translate(0%, -50%); }
 
-/* Above: card goes up, stem goes up */
-.person.above .card {
-  top: calc(50% - var(--card-gap));
-  transform: translate(-50%, -100%);
-}
-.person.above .stem {
-  height: var(--card-gap);
-  transform: translate(-50%, -100%);
-}
-
-/* Below: card goes down, stem goes down */
-.person.below .card {
-  top: calc(50% + var(--card-gap));
-  transform: translate(-50%, 0%);
-}
-.person.below .stem {
-  height: var(--card-gap);
-  transform: translate(-50%, 0%);
-}
-
-/* Mobile: switch to vertical timeline + slightly smaller font */
+/* Mobile: tighter spacing + smaller font, still the same vertical layout */
 @media (max-width: 520px) {
   html { font-size: 12px; }
   body { overflow: hidden; }
 
+  :root {
+    --card-gutter: 44px;
+    --avatar-size: 54px;
+  }
+
   .wrap { justify-content: center; }
   .controls { justify-content: center; }
 
-  .viewport {
-    height: calc(100vh - 68px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: calc(24px + env(safe-area-inset-top, 0px)) 0 30px;
-  }
+  .card-inner { padding: 12px; gap: 10px; }
 
-  .canvas {
-    width: 100% !important;
-    height: auto;
-    min-height: 100%;
-    padding: 80px 16px 24px;
-  }
-
-  /* Timeline starts at 80px so first dot (--y: 80 + 0) aligns with line */
-  .timeline-line {
-    left: 50%;
-    right: auto;
-    top: 80px;
-    bottom: 24px;
-    width: 2px;
-    height: auto;
-    transform: translateX(-50%);
-    background: linear-gradient(to bottom, transparent, var(--line), transparent);
-  }
-
-  /* Disable year ticks band (we'll show year label on cards instead) */
-  .ticks { display: none; }
-
-  /* Person positioning changes from left->top */
-  .person {
-    width: 92%;
-    left: 50% !important;
-    top: var(--y, 0px);
-    transform: translate(-50%, -50%);
-  }
-
-  /* Above/below becomes left/right */
-  .above {
-    transform: translate(-50%, -50%);
-    padding: 0;
-  }
-  .below {
-    transform: translate(-50%, -50%);
-    padding: 0;
-  }
-
-  /* Keep person centered on timeline so dot+stem stay on the line; move only the card */
-  .person.left { transform: translate(-50%, -50%); }
-  .person.right { transform: translate(-50%, -50%); }
-
-  /* Reset card: position absolute so we can place it left or right of timeline */
-  .person .card {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 3;
-  }
-  .person.above .card,
-  .person.below .card {
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  /* Card on left: from left edge of person up to stem */
-  .person.left .card {
-    left: 0;
-    width: calc(50% - 44px);
-  }
-  /* Card on right: from stem to right edge of person */
-  .person.right .card {
-    left: calc(50% + 44px);
-    width: calc(50% - 44px);
-  }
-
-  /* Stem originates at timeline (50% of .person), goes horizontal to card */
-  .stem {
-    top: 50% !important;
-    left: 50% !important;
-    height: 2px !important;
-    width: 44px;
-    transform: translateY(-50%);
-    background: rgba(255,255,255,0.22);
-    z-index: 1;
-  }
-  .person.left .stem  { transform: translate(-100%, -50%); }
-  .person.right .stem { transform: translate(0%, -50%); }
-
-  .dot {
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%);
-    z-index: 2;
-  }
-
-  .card { width: 100%; }
+  /* Not enough gutter room for year labels; keep the tick marks only */
+  .ticks .tick span { display: none; }
 }
 
 /* Small helper toast */
 .hint {
-  max-width: 1200px;
-  margin: 10px auto 0;
-  padding: 0 16px;
+  backdrop-filter: blur(10px);
+  background: rgba(11,15,23,0.85);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.62);
   font-size: 0.75rem;
+}
+
+.hint-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 16px;
 }
 
 .error {
