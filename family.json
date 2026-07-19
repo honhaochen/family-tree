@@ -54,6 +54,12 @@
       "photo": "images/haozheng.jpg"
     },
     {
+      "id": "silvia",
+      "name": "Silvia Seah Syuen Ying",
+      "birthdate": "1997-09-06",
+      "photo": "images/syuenying.jpg"
+    },
+    {
       "id": "haochen",
       "name": "Hon Hao Chen",
       "birthdate": "1999-03-26",
